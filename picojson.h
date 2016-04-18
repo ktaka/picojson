@@ -133,6 +133,7 @@ namespace picojson {
   protected:
     int type_;
     _storage u_;
+    char format_[8];
   public:
     value();
     value(int type, bool);
@@ -168,6 +169,7 @@ namespace picojson {
     std::string to_str() const;
     template <typename Iter> void serialize(Iter os, bool prettify = false) const;
     std::string serialize(bool prettify = false) const;
+    void setprecision(int n);
   private:
     template <typename T> value(const T*); // intentionally defined to block implicit conversion of pointer to bool
     template <typename Iter> static void _indent(Iter os, int indent);
@@ -178,13 +180,16 @@ namespace picojson {
   typedef value::array array;
   typedef value::object object;
   
-  inline value::value() : type_(null_type) {}
+  inline value::value() : type_(null_type) { format_[0] = '\0'; }
   
   inline value::value(int type, bool) : type_(type) {
     switch (type) {
 #define INIT(p, v) case p##type: u_.p = v; break
       INIT(boolean_, false);
-      INIT(number_, 0.0);
+      case number_type:
+        u_.number_ = 0.0;
+        format_[0] = '\0';
+        break;
 #ifdef PICOJSON_USE_INT64
       INIT(int64_, 0);
 #endif
@@ -219,6 +224,7 @@ namespace picojson {
       throw std::overflow_error("");
     }
     u_.number_ = n;
+    format_[0] = '\0';
   }
   
   inline value::value(const std::string& s) : type_(string_type) {
@@ -259,6 +265,12 @@ namespace picojson {
       INIT(array_, new array(*x.u_.array_));
       INIT(object_, new object(*x.u_.object_));
 #undef INIT
+    case number_type:
+      u_ = x.u_;
+      for (int i = 0; i < 8; i++) {
+          format_[i] = x.format_[i];
+      }
+      break;
     default:
       u_ = x.u_;
       break;
@@ -285,6 +297,7 @@ namespace picojson {
   inline void value::swap(value& x)throw() {
     std::swap(type_, x.type_);
     std::swap(u_, x.u_);
+    std::swap(format_, x.format_);
   }
   
 #define IS(ctype, jtype)			     \
@@ -401,7 +414,7 @@ namespace picojson {
     case number_type:    {
       char buf[256];
       double tmp;
-      SNPRINTF(buf, sizeof(buf), fabs(u_.number_) < (1ULL << 53) && modf(u_.number_, &tmp) == 0 ? "%.f" : "%.17g", u_.number_);
+      SNPRINTF(buf, sizeof(buf), (format_[0] == '%') ? format_ : fabs(u_.number_) < (1ULL << 53) && modf(u_.number_, &tmp) == 0 ? "%.f" : "%.17g", u_.number_);
 #if PICOJSON_USE_LOCALE
       char *decimal_point = localeconv()->decimal_point;
       if (strcmp(decimal_point, ".") != 0) {
@@ -546,6 +559,10 @@ namespace picojson {
     std::string s;
     _serialize(std::back_inserter(s), indent);
     return s;
+  }
+
+  inline void value::setprecision(int n) {
+    SNPRINTF(format_, sizeof(format_), "%%.%df", n);
   }
   
   template <typename Iter> class input {
