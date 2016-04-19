@@ -169,7 +169,7 @@ namespace picojson {
     std::string to_str() const;
     template <typename Iter> void serialize(Iter os, bool prettify = false) const;
     std::string serialize(bool prettify = false) const;
-    void setprecision(int n);
+    void set_precision(int n);
   private:
     template <typename T> value(const T*); // intentionally defined to block implicit conversion of pointer to bool
     template <typename Iter> static void _indent(Iter os, int indent);
@@ -561,7 +561,7 @@ namespace picojson {
     return s;
   }
 
-  inline void value::setprecision(int n) {
+  inline void value::set_precision(int n) {
     SNPRINTF(format_, sizeof(format_), "%%.%df", n);
   }
   
